@@ -2,6 +2,12 @@ package com.brandongogetap.stickyheaders;
 
 import android.content.Context;
 import android.os.Build;
+import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewGroup.MarginLayoutParams;
+import android.view.ViewTreeObserver;
+import android.widget.FrameLayout;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
@@ -9,25 +15,13 @@ import androidx.annotation.VisibleForTesting;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.util.Log;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.ViewGroup.MarginLayoutParams;
-import android.view.ViewTreeObserver;
-import android.widget.FrameLayout;
-import android.widget.RelativeLayout;
-import android.widget.TextView;
-
 import com.brandongogetap.stickyheaders.exposed.StickyHeaderListener;
 import com.brandongogetap.stickyheaders.exposed.TestAdapterImpl;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BinaryOperator;
+import java.util.Stack;
 
 final class StickyHeaderPositioner {
 
@@ -38,6 +32,7 @@ final class StickyHeaderPositioner {
 
     private final RecyclerView recyclerView;
     private final boolean checkMargins;
+    //    private Stack<HeaderInfo> headerInfos = new Stack<HeaderInfo>();
     private ArrayList<HeaderInfo> headerInfos = new ArrayList<HeaderInfo>();
     private final ViewTreeObserver.OnGlobalLayoutListener visibilityObserver = new ViewTreeObserver.OnGlobalLayoutListener() {
         @Override
@@ -52,16 +47,18 @@ final class StickyHeaderPositioner {
     private int getTotalHeaderHeight() {
         int ret = 0;
         for (HeaderInfo headerInfo : headerInfos) {
-            ret += headerInfo.getHeight();
+            if (headerInfo.isStubborn()) {
+                ret += headerInfo.getHeight();
+            }
         }
         return ret;
     }
 
     private void putHeaderInfo(int headerPosition, View header) {
-        if (!stubbornHeaderPositions.contains(headerPosition)) {
-            Log.e("suein", "[StickyHeaderPositioner -> putHeaderInfo] 이건 고집쎈 스티키야 " + headerPosition);
-            return;
-        }
+//        if (!stubbornHeaderPositions.contains(headerPosition)) {
+//            Log.e("suein", "[StickyHeaderPositioner -> putHeaderInfo] 이건 고집쎈 스티키야 " + headerPosition);
+//            return;
+//        }
 
         boolean isContained = false;
         for (HeaderInfo headerInfo : headerInfos) {
@@ -72,9 +69,43 @@ final class StickyHeaderPositioner {
         }
 
         if (!isContained) {
-            Log.e("suein", "[StickyHeaderPositioner -> putHeaderInfo] 추가추가 " + header.getHeight());
-            headerInfos.add(new HeaderInfo(headerPosition, header, header.getHeight()));
+            Log.e("suein", "[StickyHeaderPositioner -> putHeaderInfo getHeaderPositionToShow2 ] 추가추가 " + headerPosition + " | " + header.getHeight());
+//            headerInfos.push(new HeaderInfo(stubbornHeaderPositions.contains(headerPosition), headerPosition, header, header.getHeight()));
+            headerInfos.add(new HeaderInfo(stubbornHeaderPositions.contains(headerPosition), headerPosition, header, header.getHeight()));
         }
+    }
+
+//    private boolean removeHeaderInfo(View header) {
+//        HeaderInfo willRemoveItem = null;
+//        for (HeaderInfo headerInfo : headerInfos) {
+//            if (headerInfo.getView() == header) {
+//                willRemoveItem = headerInfo;
+//            }
+//        }
+//
+//        if (willRemoveItem != null) {
+//            return headerInfos.remove(willRemoveItem);
+//        }
+//        return false;
+//    }
+
+    private boolean removeHeaderInfo(int headerIndex) {
+        HeaderInfo willRemoveItem = null;
+        for (HeaderInfo headerInfo : headerInfos) {
+            if (headerInfo.getPosition() == headerIndex) {
+                willRemoveItem = headerInfo;
+            }
+        }
+        if (willRemoveItem != null) {
+            boolean ret = headerInfos.remove(willRemoveItem);
+            Log.e("suein", "[StickyHeaderPositioner -> removeHeaderInfo getHeaderPositionToShow2] 222 삭제 = " + headerIndex + ", ret = " + ret + ", headerInfos size = " + headerInfos.size());
+            for (HeaderInfo headerInfo :
+                    headerInfos) {
+                Log.e("suein", "[StickyHeaderPositioner -> removeHeaderInfo getHeaderPositionToShow2 ] 살아 남은거 " + headerInfo.getPosition());
+            }
+            return ret;
+        }
+        return false;
     }
 
     private int getHeaderPositionInList(View header) {
@@ -124,25 +155,41 @@ final class StickyHeaderPositioner {
     }
 
 
-    int getHeaderPositionToShow2(Map<Integer, View> visibleHeaders, View lastestView) {
+    int getHeaderPositionToShow2(Map<Integer, View> visibleHeaders, View headerForPosition) {
+
+//        int headerPositionToShow = INVALID_POSITION;
+//        if (headerIsOffset(headerForPosition)) {
+//            int offsetHeaderIndex = headerPositions.indexOf(firstVisiblePosition);
+//            if (offsetHeaderIndex > 0) {
+//                return headerPositions.get(offsetHeaderIndex - 1);
+//            }
+//        }
+//        for (Integer headerPosition : headerPositions) {
+//            if (headerPosition <= firstVisiblePosition) {
+//                headerPositionToShow = headerPosition;
+//            } else {
+//                break;
+//            }
+//        }
+
+
         int ret = INVALID_POSITION;
         int tempHeight = getTotalHeaderHeight();
 
-        Log.e("suein", "[StickyHeaderPositioner -> getHeaderPositionToShow2] " + visibleHeaders.size());
-
         for (Map.Entry<Integer, View> entry : visibleHeaders.entrySet()) {
-            Log.e("suein", "1 - [StickyHeaderPositioner -> getHeaderPositionToShow2] " + tempHeight + " = = " + (entry.getKey()) + ", entry.getValue().getTop() = " + (entry.getValue().getTop()) + ", = " + (entry.getValue().getTop() <= tempHeight) + ", " + (lastestView == entry.getValue()));
-
             if (entry.getValue().getTop() <= tempHeight) {
-                Log.e("suein", "2 - [StickyHeaderPositioner -> getHeaderPositionToShow2] " + tempHeight + " = = " + (entry.getKey()) + ", entry.getValue().getTop() = " + (entry.getValue().getTop()) + ", = " + (entry.getValue().getTop() <= tempHeight) + ", " + (lastestView == entry.getValue()));
                 ret = entry.getKey();
+                Log.e("suein", "[StickyHeaderPositioner -> getHeaderPositionToShow2] 1111 반환 = " + ret);
             } else if (entry.getValue().getTop() > tempHeight) {
                 break;
             }
         }
 
-        if (ret == INVALID_POSITION) {
-            ret = lastBoundPosition;
+
+//        Log.e("suein", "[StickyHeaderPositioner -> getHeaderPositionToShow2] " + ret + ", lastBoundPosition = " + lastBoundPosition + ", visibleHeaders = " + visibleHeaders.size());
+        if (ret == INVALID_POSITION && headerInfos.size() > 0) {
+            ret = headerInfos.get(headerInfos.size() - 1).getPosition();
+            Log.e("suein", "[StickyHeaderPositioner -> getHeaderPositionToShow2] 2222 반환 = " + ret + ", headerInfos = " + headerInfos.size());
         }
 
         return ret;
@@ -156,6 +203,7 @@ final class StickyHeaderPositioner {
 //        int headerPositionToShow2 = atTop ? INVALID_POSITION : currentHeadPosition >= 0 ? currentHeadPosition : 0;
 
         int headerPositionToShow = atTop ? INVALID_POSITION : getHeaderPositionToShow(firstVisiblePosition, visibleHeaders.get(firstVisiblePosition));
+        int headerPositionToShow2 = atTop ? INVALID_POSITION : getHeaderPositionToShow(firstVisiblePosition, visibleHeaders.get(firstVisiblePosition));
 
 
         View tempPosition = null;
@@ -171,7 +219,7 @@ final class StickyHeaderPositioner {
 
 
         View headerToCopy = visibleHeaders.get(headerPositionToShow);
-        Log.e("suein", "[StickyHeaderPositioner -> updateHeaderState] A = " + headerPositionToShow + ", B = " + temp);
+        Log.e("suein", "[StickyHeaderPositioner -> updateHeaderState] A = " + headerPositionToShow2 + ", B = " + temp);
 
         if (headerPositionToShow != lastBoundPosition) {
             if (headerPositionToShow == INVALID_POSITION || checkMargins && headerAwayFromEdge(headerToCopy)) { // We don't want to attach yet if header view is not at edge
@@ -194,6 +242,7 @@ final class StickyHeaderPositioner {
              */
             if (headerAwayFromEdge(headerToCopy)) {
                 detachHeader(lastBoundPosition);
+                removeHeaderInfo(lastBoundPosition);
                 lastBoundPosition = INVALID_POSITION;
             }
         }
@@ -264,6 +313,7 @@ final class StickyHeaderPositioner {
 
     void clearHeader() {
         detachHeader(lastBoundPosition);
+        removeHeaderInfo(lastBoundPosition);
     }
 
     void clearVisibilityObserver() {
@@ -390,8 +440,21 @@ final class StickyHeaderPositioner {
 
 //            return orientation == LinearLayoutManager.VERTICAL ?
 //                    headerForPosition.getY() > getTotalHeaderHeight() : headerForPosition.getX() > 0;
-            return orientation == LinearLayoutManager.VERTICAL ?
-                    headerForPosition.getY() > 0 : headerForPosition.getX() > 0;
+            return orientation == LinearLayoutManager.VERTICAL ? headerForPosition.getY() > 0 : headerForPosition.getX() > 0;
+        }
+        Log.e("suein", "[StickyHeaderPositioner -> headerIsOffset] false");
+        return false;
+    }
+
+
+    private boolean headerIsOffset2(View headerForPosition) {
+        if (headerForPosition != null) {
+
+            Log.e("suein", "[StickyHeaderPositioner -> headerIsOffset] true");
+
+//            return orientation == LinearLayoutManager.VERTICAL ?
+//                    headerForPosition.getY() > getTotalHeaderHeight() : headerForPosition.getX() > 0;
+            return orientation == LinearLayoutManager.VERTICAL ? headerForPosition.getY() > getTotalHeaderHeight() : headerForPosition.getX() > 0;
         }
         Log.e("suein", "[StickyHeaderPositioner -> headerIsOffset] false");
         return false;
@@ -435,6 +498,7 @@ final class StickyHeaderPositioner {
         Log.e("suein", "[StickyHeaderPositioner -> attachHeader] 삭제될녀석 = " + lastBoundPosition + ",  = " + isNormalHeader(lastBoundPosition));
 
         if (isNormalHeader(lastBoundPosition)) {
+            removeHeaderInfo(lastBoundPosition);
             detachHeader(lastBoundPosition);
         }
 
@@ -589,6 +653,7 @@ final class StickyHeaderPositioner {
 
     private void detachHeader(int position) {
         if (currentHeader != null) {
+            Log.e("suein", "[StickyHeaderPositioner -> detachHeader] " + position);
             getRecyclerParent().removeView(currentHeader);
             callDetach(position);
             clearVisibilityObserver();
@@ -676,6 +741,7 @@ final class StickyHeaderPositioner {
      */
     private void safeDetachHeader() {
         final int cachedPosition = lastBoundPosition;
+        removeHeaderInfo(cachedPosition);
         getRecyclerParent().post(new Runnable() {
             @Override
             public void run() {
