@@ -62,14 +62,14 @@ final class StickyHeaderPositioner {
 
         boolean isContained = false;
         for (HeaderInfo headerInfo : headerInfos) {
-            if (header == headerInfo.getView()) {
+            if (headerPosition == headerInfo.getPosition()) {
                 isContained = true;
                 break;
             }
         }
 
         if (!isContained) {
-            Log.e("suein", "[StickyHeaderPositioner -> putHeaderInfo getHeaderPositionToShow2 ] 추가추가 " + headerPosition + " | " + header.getHeight());
+            Log.e("suein", "[StickyHeaderPositioner -> putHeaderInfo getHeaderPositionToShow2 ] 추가추가 " + headerPosition + " | " + header.getHeight() + ", 고정식인가 = " + stubbornHeaderPositions.contains(headerPosition));
 //            headerInfos.push(new HeaderInfo(stubbornHeaderPositions.contains(headerPosition), headerPosition, header, header.getHeight()));
             headerInfos.add(new HeaderInfo(stubbornHeaderPositions.contains(headerPosition), headerPosition, header, header.getHeight()));
         }
@@ -98,9 +98,8 @@ final class StickyHeaderPositioner {
         }
         if (willRemoveItem != null) {
             boolean ret = headerInfos.remove(willRemoveItem);
-            Log.e("suein", "[StickyHeaderPositioner -> removeHeaderInfo getHeaderPositionToShow2] 222 삭제 = " + headerIndex + ", ret = " + ret + ", headerInfos size = " + headerInfos.size());
-            for (HeaderInfo headerInfo :
-                    headerInfos) {
+            Log.e("suein", "[StickyHeaderPositioner -> removeHeaderInfo getHeaderPositionToShow2] 222 삭제 = " + headerIndex + ", ret = " + ret + ", headerInfos size = " + headerInfos.size() + " = total size = " + getTotalHeaderHeight());
+            for (HeaderInfo headerInfo : headerInfos) {
                 Log.e("suein", "[StickyHeaderPositioner -> removeHeaderInfo getHeaderPositionToShow2 ] 살아 남은거 " + headerInfo.getPosition());
             }
             return ret;
@@ -171,7 +170,6 @@ final class StickyHeaderPositioner {
 //                break;
 //            }
 //        }
-
 
         int ret = INVALID_POSITION;
         int tempHeight = getTotalHeaderHeight();
@@ -246,7 +244,14 @@ final class StickyHeaderPositioner {
                 lastBoundPosition = INVALID_POSITION;
             }
         }
-        checkHeaderPositions(visibleHeaders);
+
+        checkHeaderPositions(visibleHeaders, firstVisiblePosition);
+
+//        List<Integer> absentList = testCheck(firstVisiblePosition);
+//        for (int pp : absentList) {
+//            Log.e("suein", "[StickyHeaderPositioner -> updateHeaderState] 부재중인 리스트 포지션 " + +pp);
+//        }
+
         recyclerView.post(new Runnable() {
             @Override
             public void run() {
@@ -255,10 +260,40 @@ final class StickyHeaderPositioner {
         });
     }
 
+    List<Integer> testCheck(int firstvisible) {
+        ArrayList<Integer> ret = new ArrayList<>();
+        for (int hPosition : stubbornHeaderPositions) {
+            if (hPosition <= firstvisible) {
+                boolean isExist = false;
+                for (HeaderInfo headerInfo : headerInfos) {
+                    if (headerInfo.getPosition() == hPosition) {
+                        isExist = true;
+                        break;
+                    }
+                }
+                if (!isExist) {
+                    ret.add(hPosition);
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    boolean isLastNormalHeader(int headerIndex) {
+        if (!stubbornHeaderPositions.contains(headerIndex)) {
+            int index = headerPositions.indexOf(headerIndex);
+            if (index != -1 && index != 0) {
+                return !stubbornHeaderPositions.contains(headerPositions.get(index - 1));
+            }
+        }
+        return false;
+    }
+
     // This checks visible headers and their positions to determine if the sticky header needs
     // to be offset. In reality, only the header following the sticky header is checked. Some
     // optimization may be possible here (not storing all visible headers in map).
-    void checkHeaderPositions(final Map<Integer, View> visibleHeaders) {
+    void checkHeaderPositions(final Map<Integer, View> visibleHeaders, int firstvisiblePositin) {
         if (currentHeader == null) return;
         // This can happen after configuration changes.
         if (currentHeader.getHeight() == 0) {
@@ -271,8 +306,6 @@ final class StickyHeaderPositioner {
                 //suein 현재 가장 최 상단에 있는 header 까지는 걸른다.
                 continue;
             }
-//            Log.e("suein", "[StickyHeaderPositioner -> checkHeaderPositions] 다음꺼 뭐로?? = " + lastBoundPosition);
-
             Log.e("suein", "[StickyHeaderPositioner -> checkHeaderPositions] " + entry.getKey() + " || " + isNormalHeader(entry.getKey()));
             //suein 바로 다음에 오는 nextHeader를 넣는다.
             View nextHeader = entry.getValue();
@@ -281,6 +314,27 @@ final class StickyHeaderPositioner {
         }
         if (reset) resetTranslation();
         currentHeader.setVisibility(View.VISIBLE);
+
+        List<Integer> absentHeaderList = testCheck(firstvisiblePositin);
+//        int heightSum = 0;
+//        for (int hPosition : absentHeaderList) {
+//            for (HeaderInfo headerInfo : headerInfos) {
+//                if (headerInfo.getPosition() < hPosition) {
+//                    heightSum += headerInfo.getHeight();
+//                }
+//            }
+//        }
+
+        for (int absentHeader : absentHeaderList){
+            int heightSum = 0;
+            for (HeaderInfo headerInfo : headerInfos) {
+                if (headerInfo.getPosition() < absentHeader) {
+                    heightSum += headerInfo.getHeight();
+                }
+            }
+            Log.e("suein", "[StickyHeaderPositioner -> checkHeaderPositions] 놓친거 추가한다. "+absentHeader);
+            attachHeadSimple(absentHeader, heightSum);
+        }
     }
 
     boolean isNormalHeader(int headerIndex) {
@@ -330,20 +384,6 @@ final class StickyHeaderPositioner {
     }
 
     private float offsetHeader(View nextHeader, boolean isNextNormalSticky) {
-//        boolean shouldOffsetHeader = shouldOffsetHeader(nextHeader);
-//        float offset = -1;
-//        if (shouldOffsetHeader) {
-//            if (orientation == LinearLayoutManager.VERTICAL) {
-//                offset = -(currentHeader.getHeight() - nextHeader.getY());
-//
-//                //여기서 기존 헤더 밀어내기
-////                currentHeader.setTranslationY(offset);
-//            } else {
-//                offset = -(currentHeader.getWidth() - nextHeader.getX());
-//                currentHeader.setTranslationX(offset);
-//            }
-//        }
-
         boolean shouldOffsetHeader2 = shouldOffsetHeader2(nextHeader, isNextNormalSticky);
 
         float offset = -1;
@@ -363,21 +403,7 @@ final class StickyHeaderPositioner {
             }
 
         }
-//        Log.e("suein", "[StickyHeaderPositioner -> offsetHeader] " + offset);
-
-
-//        Log.e("suein", "[StickyHeaderPositioner -> offsetHeader] 기존 = " + offset + ", 새로운거 = " + (-(getTotalHeaderHeight() - nextHeader.getY())) + ", getTotalHeaderHeight = " + getTotalHeaderHeight() + ", currentHeader.getHeight() = " + currentHeader.getHeight());
-//        Log.e("suein", "[StickyHeaderPositioner -> offsetHeader] " + offset + ",  newOffset = " + newOffset);
-
         return offset;
-    }
-
-    private boolean shouldOffsetHeader(View nextHeader) {
-        if (orientation == LinearLayoutManager.VERTICAL) {
-            return nextHeader.getY() < currentHeader.getHeight();
-        } else {
-            return nextHeader.getX() < currentHeader.getWidth();
-        }
     }
 
     private boolean shouldOffsetHeader2(View nextHeader, boolean isNextNormalSticky) {
@@ -529,6 +555,26 @@ final class StickyHeaderPositioner {
 
         currentHeader.setLayoutParams(para);
         dirty = false;
+    }
+
+    private void attachHeadSimple(int headerPosition, int headerHeight) {
+        View tempHeader = ((TestAdapterImpl) recyclerView.getAdapter()).getTestView(recyclerView.getContext(), recyclerView, headerPosition);
+        callAttach(headerPosition);
+//        recyclerView.getViewTreeObserver().addOnGlobalLayoutListener(new VisibilityObserver2implements(headerPosition));
+        putHeaderInfo(headerPosition, tempHeader);
+        getRecyclerParent().addView(tempHeader);
+        if (checkMargins) {
+            updateLayoutParams(tempHeader);
+        }
+        FrameLayout.LayoutParams para = ((FrameLayout.LayoutParams) tempHeader.getLayoutParams());
+
+        if (headerHeight != -1) {
+            para.topMargin = para.topMargin + headerHeight;
+        } else {
+            para.topMargin = para.topMargin + getTotalHeaderHeight();
+        }
+
+        tempHeader.setLayoutParams(para);
     }
 
     class VisibilityObserver2implements implements ViewTreeObserver.OnGlobalLayoutListener {
@@ -730,7 +776,7 @@ final class StickyHeaderPositioner {
                         // If header was removed during layout
                         if (currentHeader == null) return;
                         getRecyclerParent().requestLayout();
-                        checkHeaderPositions(visibleHeaders);
+                        checkHeaderPositions(visibleHeaders, -1);
                     }
                 });
     }
